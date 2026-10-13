@@ -1,1 +1,579 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Meditation Timer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&amp;display=swap" rel="stylesheet">
+  <style>
+        body { font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; }
+        .meditation-bg { background: #ebbb45; min-height: 100vh; width: 100%; }
+        .timer-text { font-variant-numeric: tabular-nums; text-shadow: 0 4px 30px rgba(0,0,0,0.15); transition: color 1.5s ease; }
+        .pulse-active { animation: timerPulse 2s ease-in-out infinite; }
+        .pulse-complete { animation: timerPulseRapid 0.6s ease-in-out infinite; }
+        @keyframes timerPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes timerPulseRapid { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        .btn-primary { backdrop-filter: blur(12px); transition: all 0.3s cubic-bezier(0.4,0,0.2,1); text-align: center; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-secondary { backdrop-filter: blur(12px); transition: all 0.3s cubic-bezier(0.4,0,0.2,1); text-align: center; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.35); transform: translateY(-2px); }
+        .btn-secondary:active { transform: translateY(0); }
+        .session-label { letter-spacing: 0.25em; text-transform: uppercase; }
+        .duration-btn { background: rgba(255,255,255,0.25); color: #372e18; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.3s ease; }
+        .duration-btn:hover { background: rgba(255,255,255,0.35); transform: translateY(-2px); }
+        .duration-btn:active { transform: translateY(0); }
+        .duration-btn.active { background: rgba(255,255,255,0.5); font-weight: 700; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .timer-ring { position: absolute; width: 352px; height: 352px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.08); top: 50%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
+        .timer-ring-outer { width: 418px; height: 418px; border-color: rgba(255,255,255,0.04); }
+        #timer-wrapper { transition: all 0.6s cubic-bezier(0.4,0,0.2,1); }
+        #timer-wrapper.timer-centered { position: relative; margin-bottom: 0; }
+        @media (max-width: 640px) {
+            .timer-ring { width: 264px; height: 264px; }
+            .timer-ring-outer { width: 319px; height: 319px; }
+        }
+        :root { --fg: #ffffff; --fg-soft: rgba(255,255,255,0.7); }
+        #settings-btn { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); right: 16px; z-index: 30; width: 44px; height: 44px; border-radius: 9999px; background: rgba(255,255,255,0.25); color: var(--fg); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(12px); transition: all 0.3s ease; }
+        #settings-btn:hover { background: rgba(255,255,255,0.35); transform: rotate(30deg); }
+        #settings-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; padding: 16px; }
+        #settings-overlay.open { display: flex; }
+        #settings-panel { background: #ffffff; color: #372e18; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90%; overflow-y: auto; }
+        .set-label { font-size: 13px; font-weight: 700; margin: 18px 0 8px; opacity: 0.7; }
+        .lang-btn, .sound-btn { flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #e5e5e5; background: #ffffff; font-weight: 600; cursor: pointer; color: #372e18; }
+        .lang-btn.active, .sound-btn.active { border-color: #372e18; background: #f6efe0; }
+        .swatch { width: 40px; height: 40px; border-radius: 9999px; border: 3px solid #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,0.2); cursor: pointer; }
+        .swatch.active { box-shadow: 0 0 0 3px #372e18; }
+        #noodle-alert { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); transform: translateX(-50%); z-index: 20; background: #ffffff; color: #372e18; border-radius: 20px; padding: 16px 28px; font-size: 20px; font-weight: 800; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.3); max-width: 90%; cursor: pointer; display: none; }
+        #noodle-alert.show { display: block; animation: noodlePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes noodlePop { 0% { transform: translateX(-50%) scale(0.6); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+        .time-input { width: 72px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.25); color: #372e18; font-weight: 700; font-size: 16px; text-align: center; outline: none; -moz-appearance: textfield; appearance: textfield; }
+        .time-input::-webkit-inner-spin-button, .time-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .time-input::placeholder { color: rgba(55,46,24,0.45); }
+        .time-input:focus { background: rgba(255,255,255,0.45); border-color: rgba(255,255,255,0.8); }
+        .set-btn { background: rgba(255,255,255,0.25); color: #372e18; backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.3s ease; }
+        .set-btn:hover { background: rgba(255,255,255,0.35); transform: translateY(-2px); }
+        .set-btn:active { transform: translateY(0); }
+    </style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+ </head>
+ <body class="w-full" style="background: rgb(235, 187, 69);">
+  <button id="settings-btn" aria-label="Settings">
+   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+  <div id="settings-overlay" role="dialog" aria-modal="true">
+   <div id="settings-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+     <h2 id="set-title" style="font-size:20px;font-weight:800;margin:0;">Settings</h2>
+     <button id="settings-close" aria-label="Close" style="font-size:28px;line-height:1;background:none;border:none;cursor:pointer;color:#372e18;">&times;</button>
+    </div>
+    <p id="set-lang-label" class="set-label">Language</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+     <button class="lang-btn" data-lang="ja">日本語</button>
+     <button class="lang-btn" data-lang="en">English</button>
+     <button class="lang-btn" data-lang="zh">中文</button>
+     <button class="lang-btn" data-lang="ko">한국어</button>
+     <button class="lang-btn" data-lang="es">Español</button>
+     <button class="lang-btn" data-lang="fr">Français</button>
+     <button class="lang-btn" data-lang="de">Deutsch</button>
+     <button class="lang-btn" data-lang="pt">Português</button>
+    </div>
+    <p id="set-bg-label" class="set-label">Background color</p>
+    <div id="swatches" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+     <input type="color" id="custom-color" value="#ebbb45" style="width:44px;height:36px;border:none;background:none;padding:0;cursor:pointer;">
+     <span id="set-custom" style="font-size:14px;">Custom color</span>
+    </div>
+    <p id="set-sound-label" class="set-label">Sound</p>
+    <div id="sound-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;"></div>
+    <label id="vib-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;font-size:13px;font-weight:700;cursor:pointer;"><span id="set-vib-label" style="opacity:0.7;">Vibration</span><input type="checkbox" id="vib-toggle" style="width:22px;height:22px;"></label>
+   </div>
+  </div>
+  <div id="noodle-alert" role="alert"><span style="font-size:36px;display:block;">🍜</span><span id="noodle-text"></span></div>
+  <main class="meditation-bg flex flex-col items-center justify-center relative py-8 sm:py-12" role="main">
+   <div class="relative z-10 flex flex-col items-center">
+    <div id="timer-wrapper" class="mb-12">
+     <h1 id="timer-display" class="timer-text text-[106px] sm:text-[132px] md:text-[158px] font-extrabold leading-none select-none bg-transparent border-none p-0" style="color: var(--fg); font-weight: 900; font-size: 174px;">0:00</h1>
+    </div>
+    <div id="duration-selector" class="mb-8 flex flex-col items-center gap-4 opacity-100 transition-opacity duration-500">
+     <div class="flex flex-nowrap gap-1 sm:gap-2">
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-seconds="10">10s</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="1">1m</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="5">5m</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="10">10m</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="15">15m</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="20">20m</button>
+     <button class="duration-btn min-w-0 flex-1 px-2 sm:px-3 py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap" data-minutes="30">30m</button>
+     <button class="duration-btn px-3 sm:px-4 py-2 rounded-lg font-semibold text-sm sm:text-base" data-minutes="45">45m</button>
+     </div>
+     <div id="time-input-row" style="display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:600;">
+      <input id="in-min" class="time-input" type="number" inputmode="numeric" min="0" max="999" placeholder="0" aria-label="minutes">
+      <span id="lbl-min">min</span>
+      <input id="in-sec" class="time-input" type="number" inputmode="numeric" min="0" max="59" placeholder="0" aria-label="seconds">
+      <span id="lbl-sec">sec</span>
+      <button id="set-time-btn" class="set-btn px-4 py-2 rounded-lg font-semibold text-sm">Set</button>
+     </div>
+    </div>
+    <div class="flex gap-4 z-10 relative">
+     <button id="start-btn" class="btn-primary px-8 py-3 rounded-full font-semibold transition-all" style="background: rgb(255,255,255); color: rgb(55,46,24); font-weight: 600; font-size: 16px;">Start</button>
+     <button id="reset-btn" class="btn-secondary px-8 py-3 rounded-full font-semibold transition-all" style="background: rgba(255,255,255,0.2); color: var(--fg); font-weight: 600; font-size: 16px;">Reset</button>
+    </div>
+   </div>
+  </main>
+  <script>
+        const TOTAL_SECONDS = 0;
+        let remainingSeconds = TOTAL_SECONDS;
+        let selectedDuration = TOTAL_SECONDS;
+        let timerInterval = null;
+        let isRunning = false;
+        let hasStarted = false;
 
+        const timerDisplay = document.getElementById('timer-display');
+        const timerWrapper = document.getElementById('timer-wrapper');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const durationSelector = document.getElementById('duration-selector');
+        const durationBtns = document.querySelectorAll('.duration-btn');
+
+        durationBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                stopAlarm();
+                timerWrapper.classList.remove('pulse-complete');
+                const minutes = parseInt(btn.dataset.minutes, 10);
+                if (btn.dataset.seconds) {
+                    const add = parseInt(btn.dataset.seconds, 10);
+                    selectedDuration += add;
+                    remainingSeconds += add;
+                } else {
+                    selectedDuration += minutes * 60;
+                    remainingSeconds += minutes * 60;
+                }
+                // buttons add time, so no "selected" highlight
+                updateDisplay();
+            });
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (!isRunning) { if (inMin.value || inSec.value) applyTimeInput(); startTimerSession(); } else pauseTimer();
+        });
+        resetBtn.addEventListener('click', () => reset());
+
+        updateDisplay();
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            timerDisplay.textContent = formatTime(remainingSeconds);
+            timerDisplay.style.color = 'var(--fg)';
+            try { updateNoodleSoundVisibility(); } catch (e) {}
+        }
+
+        let audioCtx = null;
+
+        // iPad/iPhone only allow sound after a tap, so unlock audio on Start
+        function unlockAudio() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                // play a silent blip to fully unlock iOS audio
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                g.gain.value = 0.0001;
+                o.connect(g);
+                g.connect(audioCtx.destination);
+                o.start();
+                o.stop(audioCtx.currentTime + 0.05);
+            } catch (e) {}
+        }
+
+        function playCompletionTone() {
+            vibrateNow();
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const ctx = audioCtx;
+                (SOUNDS[settings.sound] || SOUNDS.bell)(ctx);
+            } catch (e) {}
+        }
+
+        let alarmInterval = null;
+
+        function startAlarm() {
+            stopAlarm();
+            playCompletionTone();
+            alarmInterval = setInterval(playCompletionTone, 1500);
+        }
+
+        function stopAlarm() {
+            try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) {}
+            const noodle = document.getElementById('noodle-alert');
+            if (noodle) noodle.classList.remove('show');
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+        }
+
+        function onComplete() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerWrapper.classList.remove('pulse-active');
+            timerWrapper.classList.add('pulse-complete');
+            durationSelector.style.opacity = '1';
+            durationSelector.style.pointerEvents = 'auto';
+            startAlarm();
+            setStartState('start');
+            maybeNoodle();
+        }
+
+        function tick() {
+            if (remainingSeconds <= 0) { onComplete(); return; }
+            remainingSeconds--;
+            updateDisplay();
+            if (remainingSeconds <= 0) onComplete();
+        }
+
+        function startTimerSession() {
+            if (remainingSeconds <= 0) return;
+            unlockAudio();
+            isRunning = true;
+            hasStarted = true;
+            timerWrapper.classList.add('pulse-active', 'timer-centered');
+            durationSelector.style.opacity = '0';
+            durationSelector.style.pointerEvents = 'none';
+            setStartState('pause');
+            timerInterval = setInterval(tick, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerWrapper.classList.remove('pulse-active');
+            durationSelector.style.opacity = '1';
+            durationSelector.style.pointerEvents = 'auto';
+            setStartState('resume');
+        }
+
+        function reset() {
+            isRunning = false;
+            hasStarted = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            stopAlarm();
+            inMin.value = '';
+            inSec.value = '';
+            selectedDuration = TOTAL_SECONDS;
+            remainingSeconds = TOTAL_SECONDS;
+            durationBtns.forEach(b => b.classList.remove('active'));
+            timerWrapper.classList.remove('pulse-active', 'pulse-complete', 'timer-centered');
+            timerDisplay.style.color = '';
+            durationSelector.style.opacity = '1';
+            durationSelector.style.pointerEvents = 'auto';
+            setStartState('start');
+            updateDisplay();
+        }
+        // ---------- Settings: language & background color ----------
+        const I18N = {
+            en: { label: 'The Clock is Ticking', start: 'Start', pause: 'Pause', resume: 'Resume', reset: 'Reset', sec: 's', min: 'm', settings: 'Settings', language: 'Language', background: 'Background color', custom: 'Custom color', close: 'Close', sound: 'Sound', vibration: 'Vibration', unit_min: 'min', unit_sec: 'sec', set: 'Set', noodle_btn: 'Cup noodle', noodle: 'Your cup noodles are ready! 🍜', snd_bell: 'Bell', snd_chime: 'Chime', snd_beep: 'Beep', snd_digital: 'Digital', snd_gong: 'Gong', snd_marimba: 'Marimba', snd_harp: 'Harp', snd_alarm: 'Alarm', snd_drop: 'Water drop', snd_coin: 'Retro coin', snd_laser: 'Laser', snd_ufo: 'UFO', snd_heartbeat: 'Heartbeat', snd_siren: 'Siren', snd_alert: 'Emergency alert', snd_fire: 'Fire alarm' },
+            ja: { label: '時は刻々と', start: 'スタート', pause: '一時停止', resume: '再開', reset: 'リセット', sec: '秒', min: '分', settings: '設定', language: '言語', background: '背景色', custom: 'カスタム色', close: '閉じる', sound: '音', vibration: 'バイブ', unit_min: '分', unit_sec: '秒', set: 'セット', noodle_btn: 'カップラーメン', noodle: 'カップラーメンができました！🍜', snd_bell: 'ベル', snd_chime: 'チャイム', snd_beep: 'ビープ', snd_digital: 'デジタル', snd_gong: 'ゴング', snd_marimba: 'マリンバ', snd_harp: 'ハープ', snd_alarm: 'アラーム', snd_drop: '水のしずく', snd_coin: 'レトロコイン', snd_laser: 'レーザー', snd_ufo: 'UFO', snd_heartbeat: '心臓の音', snd_siren: 'サイレン', snd_alert: '緊急警報', snd_fire: '火災報知器' },
+            zh: { start: '开始', pause: '暂停', resume: '继续', reset: '重置', sec: '秒', min: '分', settings: '设置', language: '语言', background: '背景颜色', custom: '自定义颜色', close: '关闭', sound: '声音', vibration: '振动', unit_min: '分钟', unit_sec: '秒', set: '设定', noodle_btn: '泡面', noodle: '泡面好了！🍜', snd_bell: '铃声', snd_chime: '风铃', snd_beep: '蜂鸣', snd_digital: '数码', snd_gong: '锣声', snd_marimba: '马林巴', snd_harp: '竖琴', snd_alarm: '闹钟', snd_drop: '水滴', snd_coin: '复古金币', snd_laser: '激光', snd_ufo: '飞碟', snd_heartbeat: '心跳', snd_siren: '警笛', snd_alert: '紧急警报', snd_fire: '火警警报' },
+            ko: { start: '시작', pause: '일시정지', resume: '계속', reset: '초기화', sec: '초', min: '분', settings: '설정', language: '언어', background: '배경색', custom: '사용자 지정 색', close: '닫기', sound: '소리', vibration: '진동', unit_min: '분', unit_sec: '초', set: '적용', noodle_btn: '컵라면', noodle: '컵라면이 다 됐어요! 🍜', snd_bell: '벨', snd_chime: '차임', snd_beep: '비프', snd_digital: '디지털', snd_gong: '징', snd_marimba: '마림바', snd_harp: '하프', snd_alarm: '알람', snd_drop: '물방울', snd_coin: '레트로 코인', snd_laser: '레이저', snd_ufo: 'UFO', snd_heartbeat: '심장 소리', snd_siren: '사이렌', snd_alert: '긴급 경보', snd_fire: '화재 경보' },
+            es: { start: 'Iniciar', pause: 'Pausa', resume: 'Reanudar', reset: 'Reiniciar', sec: 's', min: 'm', settings: 'Ajustes', language: 'Idioma', background: 'Color de fondo', custom: 'Color personalizado', close: 'Cerrar', sound: 'Sonido', vibration: 'Vibración', unit_min: 'min', unit_sec: 's', set: 'Fijar', noodle_btn: 'Fideos instantáneos', noodle: '¡Tus fideos instantáneos están listos! 🍜', snd_bell: 'Campana', snd_chime: 'Carillón', snd_beep: 'Pitido', snd_digital: 'Digital', snd_gong: 'Gong', snd_marimba: 'Marimba', snd_harp: 'Arpa', snd_alarm: 'Alarma', snd_drop: 'Gota de agua', snd_coin: 'Moneda retro', snd_laser: 'Láser', snd_ufo: 'OVNI', snd_heartbeat: 'Latido', snd_siren: 'Sirena', snd_alert: 'Alerta de emergencia', snd_fire: 'Alarma de incendio' },
+            fr: { start: 'Démarrer', pause: 'Pause', resume: 'Reprendre', reset: 'Réinitialiser', sec: 's', min: 'm', settings: 'Réglages', language: 'Langue', background: 'Couleur de fond', custom: 'Couleur personnalisée', close: 'Fermer', sound: 'Son', vibration: 'Vibration', unit_min: 'min', unit_sec: 's', set: 'Régler', noodle_btn: 'Nouilles instantanées', noodle: 'Vos nouilles instantanées sont prêtes ! 🍜', snd_bell: 'Cloche', snd_chime: 'Carillon', snd_beep: 'Bip', snd_digital: 'Numérique', snd_gong: 'Gong', snd_marimba: 'Marimba', snd_harp: 'Harpe', snd_alarm: 'Alarme', snd_drop: 'Goutte d’eau', snd_coin: 'Pièce rétro', snd_laser: 'Laser', snd_ufo: 'OVNI', snd_heartbeat: 'Battement de cœur', snd_siren: 'Sirène', snd_alert: 'Alerte d’urgence', snd_fire: 'Alarme incendie' },
+            de: { start: 'Start', pause: 'Pause', resume: 'Weiter', reset: 'Zurücksetzen', sec: 's', min: 'm', settings: 'Einstellungen', language: 'Sprache', background: 'Hintergrundfarbe', custom: 'Eigene Farbe', close: 'Schließen', sound: 'Klang', vibration: 'Vibration', unit_min: 'Min', unit_sec: 'Sek', set: 'Setzen', noodle_btn: 'Instantnudeln', noodle: 'Deine Instantnudeln sind fertig! 🍜', snd_bell: 'Glocke', snd_chime: 'Glockenspiel', snd_beep: 'Piepton', snd_digital: 'Digital', snd_gong: 'Gong', snd_marimba: 'Marimba', snd_harp: 'Harfe', snd_alarm: 'Alarm', snd_drop: 'Wassertropfen', snd_coin: 'Retro-Münze', snd_laser: 'Laser', snd_ufo: 'UFO', snd_heartbeat: 'Herzschlag', snd_siren: 'Sirene', snd_alert: 'Notfallalarm', snd_fire: 'Feueralarm' },
+            pt: { start: 'Iniciar', pause: 'Pausar', resume: 'Continuar', reset: 'Redefinir', sec: 's', min: 'm', settings: 'Configurações', language: 'Idioma', background: 'Cor de fundo', custom: 'Cor personalizada', close: 'Fechar', sound: 'Som', vibration: 'Vibração', unit_min: 'min', unit_sec: 's', set: 'Definir', noodle_btn: 'Macarrão instantâneo', noodle: 'Seu macarrão instantâneo está pronto! 🍜', snd_bell: 'Sino', snd_chime: 'Carrilhão', snd_beep: 'Bipe', snd_digital: 'Digital', snd_gong: 'Gongo', snd_marimba: 'Marimba', snd_harp: 'Harpa', snd_alarm: 'Alarme', snd_drop: 'Gota d’água', snd_coin: 'Moeda retrô', snd_laser: 'Laser', snd_ufo: 'OVNI', snd_heartbeat: 'Batimento', snd_siren: 'Sirene', snd_alert: 'Alerta de emergência', snd_fire: 'Alarme de incêndio' }
+        };
+        const COLORS = ['#ebbb45', '#e07a5f', '#f4a6c0', '#8e6fd1', '#5b8def', '#6fb7a8', '#7bb661', '#2f3640'];
+        function tone(ctx, freq, start, dur, vol, type, attack) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const t0 = ctx.currentTime + start;
+            osc.type = type || 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(vol, t0 + (attack || 0.02));
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t0);
+            osc.stop(t0 + dur + 0.05);
+        }
+
+        function sweep(ctx, f0, f1, start, dur, vol, type) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const t0 = ctx.currentTime + start;
+            osc.type = type || 'sine';
+            osc.frequency.setValueAtTime(f0, t0);
+            osc.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t0);
+            osc.stop(t0 + dur + 0.05);
+        }
+
+        const SOUNDS = {
+            bell:    ctx => { tone(ctx, 528, 0, 0.8, 0.6); tone(ctx, 792, 0, 0.8, 0.3); },
+            chime:   ctx => { tone(ctx, 880, 0, 1.2, 0.35, 'sine', 0.05); tone(ctx, 1320, 0.05, 1.0, 0.15, 'sine', 0.05); },
+            beep:    ctx => { tone(ctx, 880, 0, 0.15, 0.25, 'square'); tone(ctx, 880, 0.25, 0.15, 0.25, 'square'); },
+            digital: ctx => { tone(ctx, 660, 0, 0.15, 0.3, 'triangle'); tone(ctx, 880, 0.15, 0.15, 0.3, 'triangle'); tone(ctx, 1100, 0.3, 0.2, 0.3, 'triangle'); },
+            gong:    ctx => { tone(ctx, 196, 0, 1.4, 0.6, 'sine', 0.03); tone(ctx, 294, 0, 1.2, 0.3, 'sine', 0.03); tone(ctx, 392, 0, 1.0, 0.2, 'sine', 0.03); },
+            marimba: ctx => { tone(ctx, 523, 0, 0.35, 0.5, 'triangle', 0.005); tone(ctx, 659, 0.12, 0.35, 0.5, 'triangle', 0.005); tone(ctx, 784, 0.24, 0.5, 0.5, 'triangle', 0.005); },
+            harp:    ctx => { [392, 523, 659, 784, 1047].forEach((f, i) => tone(ctx, f, i * 0.09, 0.8, 0.3, 'sine', 0.01)); },
+            alarm:   ctx => { [880, 660, 880, 660].forEach((f, i) => tone(ctx, f, i * 0.14, 0.12, 0.18, 'sawtooth', 0.005)); },
+            drop:    ctx => { sweep(ctx, 350, 1100, 0, 0.12, 0.5, 'sine'); sweep(ctx, 300, 900, 0.3, 0.12, 0.25, 'sine'); },
+            coin:    ctx => { tone(ctx, 988, 0, 0.08, 0.25, 'square', 0.003); tone(ctx, 1319, 0.08, 0.45, 0.25, 'square', 0.003); },
+            laser:   ctx => { sweep(ctx, 1800, 150, 0, 0.35, 0.25, 'sawtooth'); sweep(ctx, 1800, 150, 0.45, 0.35, 0.25, 'sawtooth'); },
+            ufo:     ctx => {
+                const t0 = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const lfo = ctx.createOscillator();
+                const lfoGain = ctx.createGain();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 700;
+                lfo.frequency.value = 9;
+                lfoGain.gain.value = 250;
+                lfo.connect(lfoGain);
+                lfoGain.connect(osc.frequency);
+                gain.gain.setValueAtTime(0.0001, t0);
+                gain.gain.exponentialRampToValueAtTime(0.4, t0 + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.2);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t0);
+                lfo.start(t0);
+                osc.stop(t0 + 1.25);
+                lfo.stop(t0 + 1.25);
+            },
+            heartbeat: ctx => { sweep(ctx, 160, 50, 0, 0.18, 0.9, 'sine'); sweep(ctx, 160, 50, 0.25, 0.22, 0.7, 'sine'); },
+            alert: ctx => { [0, 0.35, 0.7].forEach(s => { tone(ctx, 853, s, 0.28, 0.3, 'sine', 0.005); tone(ctx, 960, s, 0.28, 0.3, 'sine', 0.005); }); },
+            noodle: ctx => {
+                // simmering pot: low rumbling noise + random bubbles
+                const dur = 1.4;
+                const len = Math.floor(ctx.sampleRate * dur);
+                const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 500;
+                const g = ctx.createGain();
+                const t0 = ctx.currentTime;
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.1);
+                g.gain.setValueAtTime(0.25, t0 + 1.2);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+                src.connect(filter);
+                filter.connect(g);
+                g.connect(ctx.destination);
+                src.start(t0);
+                for (let i = 0; i < 16; i++) {
+                    const f0 = 180 + Math.random() * 300;
+                    sweep(ctx, f0, f0 * (2 + Math.random()), Math.random() * 1.25, 0.06 + Math.random() * 0.08, 0.2 + Math.random() * 0.2, 'sine');
+                }
+            }
+        };
+
+        let settings = { lang: 'en', bg: '#ebbb45', sound: 'bell', vibrate: true };
+
+        function vibrateNow() {
+            try {
+                if (settings.vibrate && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            } catch (e) {}
+        }
+        let startState = 'start';
+
+        const settingsOverlay = document.getElementById('settings-overlay');
+        const swatchesEl = document.getElementById('swatches');
+        const customColor = document.getElementById('custom-color');
+
+        function t(key) { return I18N[settings.lang][key]; }
+
+        function setStartState(s) {
+            startState = s;
+            startBtn.textContent = t(s);
+        }
+
+        function saveSettings() {
+            try { localStorage.setItem('meditation-settings', JSON.stringify(settings)); } catch (e) {}
+        }
+
+        function loadSettings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('meditation-settings') || 'null');
+                if (saved) {
+                    if (I18N[saved.lang]) settings.lang = saved.lang;
+                    if (/^#[0-9a-f]{6}$/i.test(saved.bg || '')) settings.bg = saved.bg;
+                    if (SOUNDS[saved.sound]) settings.sound = saved.sound;
+                    if (typeof saved.vibrate === 'boolean') settings.vibrate = saved.vibrate;
+                }
+            } catch (e) {}
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = settings.lang;
+            resetBtn.textContent = t('reset');
+            startBtn.textContent = t(startState);
+            durationBtns.forEach(btn => {
+                btn.textContent = btn.dataset.seconds
+                    ? btn.dataset.seconds + t('sec')
+                    : btn.dataset.minutes + t('min');
+            });
+            document.getElementById('set-title').textContent = t('settings');
+            document.getElementById('set-lang-label').textContent = t('language');
+            document.getElementById('set-bg-label').textContent = t('background');
+            document.getElementById('set-custom').textContent = t('custom');
+            document.getElementById('set-sound-label').textContent = t('sound');
+            document.getElementById('set-vib-label').textContent = t('vibration');
+            document.getElementById('lbl-min').textContent = t('unit_min');
+            document.getElementById('lbl-sec').textContent = t('unit_sec');
+            document.getElementById('set-time-btn').textContent = t('set');
+            document.querySelectorAll('.sound-btn').forEach(b => {
+                b.textContent = b.dataset.sound === 'noodle' ? '🍜 ' + t('noodle_btn') : t('snd_' + b.dataset.sound);
+                b.classList.toggle('active', b.dataset.sound === settings.sound);
+            });
+            document.getElementById('settings-btn').setAttribute('aria-label', t('settings'));
+            document.getElementById('settings-close').setAttribute('aria-label', t('close'));
+            document.querySelectorAll('.lang-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.lang === settings.lang);
+            });
+        }
+
+        function applyBg() {
+            const color = settings.bg;
+            document.body.style.background = color;
+            document.querySelector('.meditation-bg').style.background = color;
+            // text is always white
+            document.documentElement.style.setProperty('--fg', '#ffffff');
+            document.documentElement.style.setProperty('--fg-soft', 'rgba(255,255,255,0.7)');
+            customColor.value = color;
+            document.querySelectorAll('.swatch').forEach(s => {
+                s.classList.toggle('active', s.dataset.color === color.toLowerCase());
+            });
+        }
+
+        COLORS.forEach(c => {
+            const s = document.createElement('button');
+            s.className = 'swatch';
+            s.dataset.color = c;
+            s.style.background = c;
+            s.setAttribute('aria-label', c);
+            s.addEventListener('click', () => {
+                settings.bg = c;
+                applyBg();
+                saveSettings();
+            });
+            swatchesEl.appendChild(s);
+        });
+
+        customColor.addEventListener('input', () => {
+            settings.bg = customColor.value;
+            applyBg();
+            saveSettings();
+        });
+
+        document.querySelectorAll('.lang-btn').forEach(b => {
+            b.addEventListener('click', () => {
+                settings.lang = b.dataset.lang;
+                applyLanguage();
+                saveSettings();
+            });
+        });
+
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            updateNoodleSoundVisibility();
+            settingsOverlay.classList.add('open');
+        });
+        document.getElementById('settings-close').addEventListener('click', () => settingsOverlay.classList.remove('open'));
+        settingsOverlay.addEventListener('click', (e) => {
+            if (e.target === settingsOverlay) settingsOverlay.classList.remove('open');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') settingsOverlay.classList.remove('open');
+        });
+
+        const soundList = document.getElementById('sound-list');
+        Object.keys(SOUNDS).forEach(key => {
+            const b = document.createElement('button');
+            b.className = 'sound-btn';
+            b.dataset.sound = key;
+            b.addEventListener('click', () => {
+                settings.sound = key;
+                document.querySelectorAll('.sound-btn').forEach(x => {
+                    x.classList.toggle('active', x.dataset.sound === key);
+                });
+                saveSettings();
+                unlockAudio();
+                playCompletionTone(); // preview
+            });
+            soundList.appendChild(b);
+        });
+
+        // Cup noodle (secret): the sound option only shows up while the timer is exactly 3:00.
+        // With that sound the alert always shows; otherwise a 3:00 timer has a 5% chance.
+        function maybeNoodle() {
+            if (selectedDuration === 180 && (settings.sound === 'noodle' || Math.random() < 0.05)) {
+                document.getElementById('noodle-text').textContent = t('noodle');
+                document.getElementById('noodle-alert').classList.add('show');
+            }
+        }
+
+        function updateNoodleSoundVisibility() {
+            const b = document.querySelector('.sound-btn[data-sound="noodle"]');
+            if (!b) return;
+            b.style.display = (remainingSeconds === 180 || settings.sound === 'noodle') ? '' : 'none';
+        }
+        document.getElementById('noodle-alert').addEventListener('click', () => {
+            document.getElementById('noodle-alert').classList.remove('show');
+        });
+
+        const inMin = document.getElementById('in-min');
+        const inSec = document.getElementById('in-sec');
+
+        function applyTimeInput() {
+            stopAlarm();
+            timerWrapper.classList.remove('pulse-complete');
+            const m = Math.max(0, parseInt(inMin.value, 10) || 0);
+            const s = Math.max(0, parseInt(inSec.value, 10) || 0);
+            const total = Math.min(m * 60 + s, 999 * 60 + 59);
+            selectedDuration = total;
+            remainingSeconds = total;
+            inMin.value = '';
+            inSec.value = '';
+            updateDisplay();
+        }
+
+        document.getElementById('set-time-btn').addEventListener('click', applyTimeInput);
+        [inMin, inSec].forEach(el => {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') applyTimeInput();
+            });
+        });
+
+        const vibToggle = document.getElementById('vib-toggle');
+        vibToggle.addEventListener('change', () => {
+            settings.vibrate = vibToggle.checked;
+            saveSettings();
+            vibrateNow();
+        });
+        // devices without vibration support (e.g. iPhone/iPad Safari) don't show the option
+        if (!('vibrate' in navigator)) document.getElementById('vib-row').style.display = 'none';
+
+        loadSettings();
+        vibToggle.checked = settings.vibrate;
+        applyLanguage();
+        applyBg();
+        updateNoodleSoundVisibility();
+        updateDisplay();
+    </script>
+</body></html>
